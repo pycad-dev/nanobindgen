@@ -1,0 +1,3 @@
+[submodule "tree-sitter-doxygen"]
+	path = tree-sitter-doxygen
+	url = https://github.com/tree-sitter-grammars/tree-sitter-doxygen
