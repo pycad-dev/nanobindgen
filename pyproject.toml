@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nanobindgen"
+version = "0.0.1"
+description = "A Python package with a custom tree-sitter grammar"
+readme = "README.md"
+requires-python = ">=3.7"
+license = { file = "LICENSE" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+dependencies = ["tree-sitter"]
+
+[project.urls]
+"Homepage" = "https://github.com/pycad-dev/nanobindgen"
