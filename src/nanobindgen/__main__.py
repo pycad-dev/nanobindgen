@@ -9,7 +9,8 @@ from tree_sitter import Language, Node, Parser, Query
 
 CPP_LANGUAGE = Language(tree_sitter_cpp.language(), "cpp")
 DOXYGEN_LANGUAGE = Language(
-    str(Path.home() / "Programming/tree-sitter-doxygen/doxygen.dylib"), "doxygen"
+    Path(__file__).parent.parent.parent / "doxygen.dylib",
+    "doxygen",
 )
 
 # Initialize parser
@@ -18,8 +19,6 @@ cpp_parser.set_language(CPP_LANGUAGE)  # Needed in 0.21
 
 doxygen_parser = Parser()
 doxygen_parser.set_language(DOXYGEN_LANGUAGE)
-
-# tree = parser.parse(
 
 
 class_query = CPP_LANGUAGE.query("""
@@ -127,9 +126,9 @@ def build_function_docstring(node: Node):
 
 
 def build_function(
-        match: Dict[str, Node | List[Node]],
-        overload: bool = True,
-        class_name: Optional[str] = None,
+    match: Dict[str, Node | List[Node]],
+    overload: bool = True,
+    class_name: Optional[str] = None,
 ) -> str:
     """Build a function or method declaration."""
 
