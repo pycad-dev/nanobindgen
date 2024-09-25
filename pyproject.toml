@@ -13,7 +13,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
 ]
-dependencies = ["tree-sitter"]
+dependencies = ["tree-sitter==0.21.3", "tree-sitter-cpp==0.22.3"]
 
 [project.urls]
 "Homepage" = "https://github.com/pycad-dev/nanobindgen"
