@@ -5,6 +5,7 @@ import subprocess
 
 import setuptools.command.build
 from setuptools import Command
+from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
 
 
 def get_shared_lib_extension():
@@ -44,5 +45,17 @@ class BuildTreesitterDoxygen(Command):
         )
 
 
+class bdist_wheel(_bdist_wheel):
+    def finalize_options(self):
+        # Mark the wheel as non-pure (platform-specific)
+        self.root_is_pure = False
+        super().finalize_options()
+
+
 setuptools.command.build.build.sub_commands.append(("build_treesitter_doxygen", None))
-setuptools.setup(cmdclass={"build_treesitter_doxygen": BuildTreesitterDoxygen})
+setuptools.setup(
+    cmdclass={
+        "build_treesitter_doxygen": BuildTreesitterDoxygen,
+        "bdist_wheel": bdist_wheel,
+    }
+)
