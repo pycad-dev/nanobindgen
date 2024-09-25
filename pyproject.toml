@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=45", "wheel"]
+requires = ["setuptools>=45", "wheel", "tree-sitter"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -17,3 +17,6 @@ dependencies = ["tree-sitter==0.21.3", "tree-sitter-cpp==0.22.3"]
 
 [project.urls]
 "Homepage" = "https://github.com/pycad-dev/nanobindgen"
+
+[tool.setuptools.package-data]
+nanobindgen = ["*.so", "*.dylib"]

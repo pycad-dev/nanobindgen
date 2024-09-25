@@ -2,14 +2,28 @@ import argparse
 from pathlib import Path
 from typing import Dict, List, Optional
 
+import platform
 import tree_sitter
 import tree_sitter_cpp
 from attr import dataclass
 from tree_sitter import Language, Node, Parser, Query
 
+
+def get_shared_lib_extension():
+    system = platform.system()
+    if system == "Linux":
+        return ".so"
+    elif system == "Darwin":  # macOS
+        return ".dylib"
+    elif system == "Windows":
+        return ".dll"
+    else:
+        raise RuntimeError("Unsupported system: {}".format(system))
+
+
 CPP_LANGUAGE = Language(tree_sitter_cpp.language(), "cpp")
 DOXYGEN_LANGUAGE = Language(
-    Path(__file__).parent.parent.parent / "doxygen.dylib",
+    Path(__file__).parent / ("doxygen" + get_shared_lib_extension()),
     "doxygen",
 )
 
