@@ -24,8 +24,8 @@ jobs:
 
       - name: Set up tree-sitter
         uses: tree-sitter/setup-action@v1
+        with:
           install-lib: false
-
 
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.21.1
