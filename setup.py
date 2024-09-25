@@ -51,6 +51,10 @@ class bdist_wheel(_bdist_wheel):
         super().finalize_options()
         self.root_is_pure = False
 
+    def get_tag(self):
+        python, abi, plat = super().get_tag()
+        return "py39", "none", plat
+
 
 setuptools.command.build.build.sub_commands.append(("build_treesitter_doxygen", None))
 setuptools.setup(
