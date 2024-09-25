@@ -28,13 +28,6 @@ jobs:
       - name: Set up tree-sitter
         uses: tree-sitter/setup-action/cli@v1
 
-      #   - name: Build wheels
-      #     uses: pypa/cibuildwheel@v2.21.1
-      #     env:
-      #       CIBW_BUILD: "cp39-*"
-      #       CIBW_BUILD_VERBOSITY: 1
-      #       CIBW_REPAIR_WHEEL_COMMAND: ""
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -53,11 +46,6 @@ jobs:
         with:
           name: wheels
           path: dist/*.whl
-
-    #   - uses: actions/upload-artifact@v4
-    #     with:
-    #       name: cibw-wheels-${{ matrix.os }}-${{ strategy.job-index }}
-    #       path: ./wheelhouse/*.whl
 
   build_sdist:
     name: Build source distribution
