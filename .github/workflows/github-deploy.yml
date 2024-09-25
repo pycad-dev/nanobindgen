@@ -41,6 +41,10 @@ jobs:
       - name: Build wheel
         run: pip wheel --no-deps -w dist .
 
+      - name: Debug
+        run: |
+          tree src
+
       - name: Upload wheel
         uses: actions/upload-artifact@v4
         with:
