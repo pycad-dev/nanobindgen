@@ -19,6 +19,11 @@ jobs:
         # macos-13 is an intel runner, macos-14 is apple silicon
         # os: [ubuntu-latest, windows-latest, macos-13, macos-14]
         os: [ubuntu-latest, windows-latest, macos-14]
+        include:
+          - os: macos-13
+            architecture: x64
+          - os: macos-14
+            architecture: arm64
 
     steps:
       - uses: actions/checkout@v4
@@ -31,7 +36,6 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          # Older version needed to prevent universal wheel
           python-version: "3.9"
 
       - name: Install build dependencies
