@@ -1,10 +1,15 @@
 """Setuptools install script."""
 
+import os
 import platform
+import shutil
 import subprocess
+import tempfile
 
 import setuptools.command.build
+
 from setuptools import Command
+from setuptools.command.build_py import build_py
 from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
 
 
@@ -21,28 +26,31 @@ def get_shared_lib_extension():
         raise RuntimeError("Unsupported system: {}".format(system))
 
 
-class BuildTreesitterDoxygen(Command):
-    """Build the tree-sitter-doxygen parser."""
-
-    def initialize_options(self):  # noqa: D102
-        pass
-
-    def finalize_options(self):  # noqa: D102
-        pass
+class CustomBuildPy(build_py):
+    """Custom build command to build tree-sitter-doxygen and copy the shared library."""
 
     def run(self):
         """Build tree-sitter-doxygen."""
         ext = get_shared_lib_extension()
-        subprocess.run(
-            [
-                "tree-sitter",
-                "build",
-                "-o",
-                "src/nanobindgen/doxygen" + ext,
-                "./tree-sitter-doxygen",
-            ],
-            check=True,
-        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            build_path = tmpdir + "doxygen" + ext
+            subprocess.run(
+                [
+                    "tree-sitter",
+                    "build",
+                    "-o",
+                    build_path,
+                    "./tree-sitter-doxygen",
+                ],
+                check=True,
+            )
+
+            # Copy the shared library to the package directory
+            dst = os.path.join(self.build_lib, "nanobindgen", "doxygen" + ext)
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            shutil.copy2(build_path, dst)
+
+        super().run()
 
 
 class bdist_wheel(_bdist_wheel):
@@ -56,10 +64,9 @@ class bdist_wheel(_bdist_wheel):
         return "py39", "none", plat
 
 
-setuptools.command.build.build.sub_commands.append(("build_treesitter_doxygen", None))
 setuptools.setup(
     cmdclass={
-        "build_treesitter_doxygen": BuildTreesitterDoxygen,
+        "build_py": CustomBuildPy,
         "bdist_wheel": bdist_wheel,
     }
 )
