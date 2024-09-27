@@ -2,30 +2,14 @@ import argparse
 from pathlib import Path
 from typing import Dict, List, Optional
 
-import platform
-import tree_sitter
 import tree_sitter_cpp
-from attr import dataclass
-from tree_sitter import Language, Node, Parser, Query
+import tree_sitter_jsdoc
+from dataclasses import dataclass
+from tree_sitter import Language, Node, Parser
 
-
-def get_shared_lib_extension():
-    system = platform.system()
-    if system == "Linux":
-        return ".so"
-    elif system == "Darwin":  # macOS
-        return ".dylib"
-    elif system == "Windows":
-        return ".dll"
-    else:
-        raise RuntimeError("Unsupported system: {}".format(system))
-
-
+# We use JSDoc since it is available on PyPI and has similar syntax
+DOXYGEN_LANGUAGE = Language(tree_sitter_jsdoc.language(), "doxygen")
 CPP_LANGUAGE = Language(tree_sitter_cpp.language(), "cpp")
-DOXYGEN_LANGUAGE = Language(
-    Path(__file__).parent / ("doxygen" + get_shared_lib_extension()),
-    "doxygen",
-)
 
 # Initialize parser
 cpp_parser = Parser()
@@ -98,13 +82,8 @@ def build_function_docstring(node: Node):
 
     for n in node.children:
         match n.type:
-            case "brief_header":
-                brief = (
-                    n.children[-1]
-                    .text.decode("utf-8")
-                    .replace("*", "")
-                    .replace("\n", "\\n")
-                )
+            case "description":
+                brief = n.text.decode("utf-8").replace("*", "").replace("\n", "\\n")
             case "tag":
                 match n.children[0].text.decode("utf-8"):
                     case "@param":
@@ -217,8 +196,7 @@ query_class_comment = DOXYGEN_LANGUAGE.query("""
 ) """)
 
 func_doc_brief_query = DOXYGEN_LANGUAGE.query("""
-(brief_header
-    (brief_description) @description)
+((description) @description)
 """)
 
 

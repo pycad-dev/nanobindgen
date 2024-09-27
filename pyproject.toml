@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "nanobindgen"
 version = "0.0.1"
-description = "A Python package with a custom tree-sitter grammar"
+description = "Automatically generate nanobind bindings."
 readme = "README.md"
 requires-python = ">=3.7"
 license = { file = "LICENSE" }
@@ -13,7 +13,11 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
 ]
-dependencies = ["tree-sitter==0.21.3", "tree-sitter-cpp==0.22.3"]
+dependencies = [
+    "tree-sitter==0.21.3",
+    "tree-sitter-cpp==0.22.3",
+    "tree-sitter-jsdoc==0.21.0",
+]
 
 [project.urls]
 "Homepage" = "https://github.com/pycad-dev/nanobindgen"
