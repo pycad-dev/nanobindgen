@@ -1,7 +1,5 @@
-*.dylib
-*.so
-*.dSYM/
-*.plist
+.envrc
+.direnv/
 
 ### Python ###
 # Byte-compiled / optimized / DLL files
