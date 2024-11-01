@@ -7,6 +7,8 @@ import tree_sitter_jsdoc
 from dataclasses import dataclass
 from tree_sitter import Language, Node, Parser
 
+TAB = "    "
+
 # We use JSDoc since it is available on PyPI and has similar syntax
 DOXYGEN_LANGUAGE = Language(tree_sitter_jsdoc.language(), "doxygen")
 CPP_LANGUAGE = Language(tree_sitter_cpp.language(), "cpp")
@@ -110,7 +112,7 @@ def build_function_docstring(node: Node):
 
     if params:
         params_text = [f"{i}: {d}" for (i, d) in params]
-        doc += r"\n\nParams:\n\t" + r"\n\t".join(params_text)
+        doc += r"\n\nParams:\n" + TAB + (r"\n" + TAB).join(params_text)
 
     if ret:
         doc += r"\n\nReturns: " + ret
@@ -227,7 +229,7 @@ def match_classes(node: Node) -> str:
         fn_matches = method_query.matches(match[1]["class"])
         fn_names = [match[1]["name"].text for match in fn_matches]
         fn_defs = [
-            "\n\t\t"
+            f"\n{TAB}{TAB}"
             + build_function(
                 match[1], fn_names.count(match[1]["name"].text) > 1, class_name
             )
@@ -253,7 +255,7 @@ def generate_free_functions(node: Node) -> str:
         for match in fn_matches
     ]
 
-    output = "\n\t".join(fn_defs)
+    output = f"\n{TAB}".join(fn_defs)
     return output
 
 
@@ -284,8 +286,10 @@ def generate_enums(node: Node) -> str:
             enumerators.append((entry_name, value))
 
         enums.append(
-            f'\tnb::enum_<{name}>(m, "{name}")'
-            + "".join(f'\n\t\t.value("{n}", {name}::{n})' for (n, v) in enumerators)
+            f'{TAB}nb::enum_<{name}>(m, "{name}")'
+            + "".join(
+                f'\n{TAB}{TAB}.value("{n}", {name}::{n})' for (n, v) in enumerators
+            )
             + ";"
         )
 
