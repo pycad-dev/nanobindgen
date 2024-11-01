@@ -112,7 +112,7 @@ def build_function_docstring(node: Node):
 
     if params:
         params_text = [f"{i}: {d}" for (i, d) in params]
-        doc += r"\n\nParams:\n" + TAB + (r"\n" + TAB).join(params_text)
+        doc += r"\n\nArgs:\n" + TAB + (r"\n" + TAB).join(params_text)
 
     if ret:
         doc += r"\n\nReturns: " + ret
