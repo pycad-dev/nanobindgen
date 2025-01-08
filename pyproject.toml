@@ -24,3 +24,35 @@ dependencies = [
 
 [tool.setuptools.package-data]
 nanobindgen = ["*.so", "*.dylib"]
+
+[tool.ruff]
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "W",
+    "I",
+    "N",
+    "A",
+    "B",
+    "F",
+    "D",
+    "FBT",
+    "C4",
+    "SIM",
+    "TD",
+    "PL",
+    "TRY",
+    "NPY",
+    "PERF",
+    "RUF",
+]
+ignore = [
+    "TRY003",  # Exception with string (vs. defining custom exception)
+    "PLR2004", # Magic number
+    "S607",
+    "F403",    # Star imports
+    "F405",    # Star imports
+]
+pydocstyle.convention = "google"
