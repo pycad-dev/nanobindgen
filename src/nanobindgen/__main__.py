@@ -237,7 +237,7 @@ def match_classes(node: Node) -> str:
         ]
         class_output += "".join(fn_defs) + ";"
 
-        output += class_output
+        output += "\n" + class_output
 
     return output
 
