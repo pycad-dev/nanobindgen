@@ -124,7 +124,6 @@ def build_function(
     class_name: Optional[str] = None,
 ) -> str:
     """Build a function or method declaration."""
-
     comment_tree = doxygen_parser.parse(match["comment"].text)
     brief = func_doc_brief_query.matches(comment_tree.root_node)
 
@@ -165,6 +164,7 @@ def build_function(
     if python_name:
         bind_name = python_name
 
+    # Get the proper definition function e.g. def, def_prop_ro, def_static
     def_fn = "def"
     if fn_name.startswith("get"):
         def_fn = "def_prop_ro"
@@ -201,8 +201,10 @@ func_doc_brief_query = DOXYGEN_LANGUAGE.query("""
 
 
 # Match classes
-def match_classes(node: Node) -> str:
+def generate_classes(node: Node) -> str:
     output = ""
+
+    classes: List[str] = []
 
     for match in class_query.matches(node):
         class_name = match[1]["name"].text.decode("utf-8")
@@ -222,8 +224,11 @@ def match_classes(node: Node) -> str:
                         )
                 ...
 
-        class_output = f'nb::class_<{", ".join(class_hierarchy)}>(m, "{class_name}")'
+        class_output = (
+            TAB + f'nb::class_<{", ".join(class_hierarchy)}>(m, "{class_name}")'
+        )
 
+        # Bind class methods
         fn_matches = method_query.matches(match[1]["class"])
         fn_names = [match[1]["name"].text for match in fn_matches]
         fn_defs = [
@@ -235,25 +240,23 @@ def match_classes(node: Node) -> str:
         ]
         class_output += "".join(fn_defs) + ";"
 
-        output += "\n" + class_output
+        classes.append(class_output)
 
-    return output
+    return "\n\n".join(classes)
 
 
 def generate_free_functions(node: Node) -> str:
-    # for match in function_query.matches(node):
-    #     output += build_function(match[1])
-
     fn_matches = function_query.matches(node)
     fn_names = [match[1]["name"].text for match in fn_matches]
     fn_defs = [
-        "m"
+        TAB
+        + "m"
         + build_function(match[1], fn_names.count(match[1]["name"].text) > 1, None)
         + ";"
         for match in fn_matches
     ]
 
-    output = f"\n{TAB}".join(fn_defs)
+    output = f"\n\n".join(fn_defs)
     return output
 
 
@@ -297,8 +300,8 @@ def generate_enums(node: Node) -> str:
 def build_header(header_name: str, source_code: str) -> str:
     tree = cpp_parser.parse(bytes(source_code, "utf8"))
 
+    classes = generate_classes(tree.root_node)
     free_functions = generate_free_functions(tree.root_node)
-
     enums = generate_enums(tree.root_node)
 
     return f"""#pragma once
@@ -308,10 +311,10 @@ def build_header(header_name: str, source_code: str) -> str:
 void bind_{header_name.lower()}(nb::module_ &m)
 {{
     // Classes
-    {match_classes(tree.root_node)}
+{classes}
 
     // Functions
-    {free_functions}
+{free_functions}
 
     // Enums
 {enums}

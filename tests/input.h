@@ -8,32 +8,40 @@ public:
 
   void param(int a);
 
+
+
+
+
   void nontrivial_params(std::vector<std::string> &a, double *b = nullptr,
                          std::vector<int> &c = std::vector<int>());
 
-  void overload(int a);
-
-  void overload(double a);
-
   /**
-   * Hi
+   * An overloaded function
    *
-   * @param a Hello
+   * @param a First param
    */
   void overload(double &a);
+
+
+  /**
+   * An overloaded function
+   * 
+   * @param a Alternate param
+   */
+  void overload(int a);
 
   static int static_method();
 };
 
 /**
- * Test2
+ * Second class
  *
  */
 class Test2 {
 public:
   /**
-   * Hive
-   *
+   * Trivial function
+   * 
    */
   void trivial();
 };
@@ -47,16 +55,10 @@ public:
  */
 void free(int a, double b);
 
-/**
- * Hello
- *
- * @param Bye Heat death of the universe
- */
-void free(char c);
 
 /**
- * Bye
+ * A simple return type
  *
- * @return int
+ * @return Simple return type
  */
-int free2();
+int free_return_simple();
