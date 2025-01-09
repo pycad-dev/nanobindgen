@@ -28,4 +28,4 @@ def test_bindings():
 
         f_diff.write("\n".join(diff))
 
-        assert binding == expected_binding
+    assert binding == expected_binding

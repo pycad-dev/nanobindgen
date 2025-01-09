@@ -1,4 +1,6 @@
 from dataclasses import dataclass
+from enum import Enum, auto
+import re
 from typing import Dict, List, Optional
 
 import tree_sitter_cpp
@@ -67,83 +69,111 @@ parameter_query = CPP_LANGUAGE.query("""
 """)
 
 
+# @dataclass
+# class FunctionParam:
+#     name: str
+#     doc: str
+
+
 @dataclass
-class FunctionDoc:
-    doc: str
-    python_name: Optional[str]
+class FunctionDoxygen:
+    should_bind: bool
+    py_name: str
+    brief: str
+    dox_params: List[tuple[str, str]]
+    dox_ret: str
+    nb_dict: str
 
+    @classmethod
+    def parse(cls, doxygen_node_unparsed: Node, cpp_name: str) -> "FunctionDoxygen":
+        """Parse a function's doxygen comment."""
+        should_bind = False
+        brief = ""
+        py_name = cpp_name
+        dox_params: List[tuple[str, str]] = []
+        dox_ret = ""
+        nb_dict = ""
 
-def build_function_docstring(node: Node):
-    brief = ""
-    params = []
-    ret = ""
-    doc = ""
-    python_name = None
+        doxygen_node = doxygen_parser.parse(doxygen_node_unparsed.text).root_node
 
-    for n in node.children:
-        match n.type:
-            case "description":
-                brief = n.text.decode("utf-8").replace("*", "").replace("\n", "\\n")
-            case "tag":
-                match n.children[0].text.decode("utf-8"):
-                    case "@param":
-                        params.append(
-                            (
-                                n.children[1].text.decode("utf-8"),
-                                n.children[2]
+        for n in doxygen_node.children:
+            match n.type:
+                case "description":
+                    brief = n.text.decode("utf-8").replace("*", "").replace("\n", "\\n")
+                case "tag":
+                    match n.children[0].text.decode("utf-8"):
+                        case "@param":
+                            dox_params.append(
+                                (
+                                    n.children[1].text.decode("utf-8"),
+                                    n.children[2]
+                                    .text.decode("utf-8")
+                                    .replace("*", "")
+                                    .replace("\n", "\\n"),
+                                )
+                            )
+                        case "@return":
+                            dox_ret = (
+                                n.children[1]
                                 .text.decode("utf-8")
                                 .replace("*", "")
-                                .replace("\n", "\\n"),
+                                .replace("\n", "\\n")
                             )
-                        )
-                    case "@return":
-                        ret = (
-                            n.children[1]
-                            .text.decode("utf-8")
-                            .replace("*", "")
-                            .replace("\n", "\\n")
-                        )
-                    case "@python_name":
-                        python_name = n.children[1].text.decode("utf-8")
+                        case "@nb":
+                            should_bind = True
+                            if len(n.children) > 1:
+                                nb_dict = n.children[1].text.decode("utf-8")
 
-    doc += brief
+        return cls(should_bind, py_name, brief, dox_params, dox_ret, nb_dict)
 
-    if params:
-        params_text = [f"{i}: {d}" for (i, d) in params]
-        doc += r"\n\nArgs:\n" + TAB + (r"\n" + TAB).join(params_text)
+    def gen_docstring(self) -> str:
+        doc = ""
+        doc += self.brief
 
-    if ret:
-        doc += r"\n\nReturns: " + ret
+        if self.dox_params:
+            params_text = [f"{i}: {d}" for (i, d) in self.dox_params]
+            doc += r"\n\nArgs:\n" + TAB + (r"\n" + TAB).join(params_text)
 
-    return FunctionDoc(doc, python_name)
+        if self.dox_ret:
+            doc += r"\n\nReturns: " + self.dox_ret
+
+        return doc
+
+
+class BindingType(Enum):
+    PLAIN = auto()
+    OVERLOAD = auto()
+    PROP_RO = auto()
+    PROP_RW = auto()
+
+
+@dataclass
+class FunctionBinding:
+    py_name: str
+    cpp_declarations: List[Dict[str, Node]]
+    doxygen: FunctionDoxygen
+    binding_type: BindingType = BindingType.PLAIN
 
 
 def build_function(
-    match: Dict[str, Node | List[Node]],
-    overload: bool = True,
+    function: FunctionBinding,
     class_name: Optional[str] = None,
 ) -> str:
     """Build a function or method declaration."""
-    comment_tree = doxygen_parser.parse(match["comment"].text)
-    brief = func_doc_brief_query.matches(comment_tree.root_node)
+    docstring = function.doxygen.gen_docstring()
 
-    if not brief:
-        return ""
-
-    function_doc = build_function_docstring(comment_tree.root_node)
-    doc = function_doc.doc
-    python_name = function_doc.python_name
-
-    params: list[tuple[str, str, Optional[str]]] = []
-    if "parameters" in match:
-        for param_match in parameter_query.matches(match["parameters"]):
+    # Parse cpp declaration parameters.
+    cpp_match = function.cpp_declarations[0]
+    cpp_params: list[tuple[str, str, Optional[str]]] = []
+    if "parameters" in function.cpp_declarations[0]:
+        for param_match in parameter_query.matches(cpp_match["parameters"]):
             param_type = param_match[1]["type"].text.decode("utf-8")
             identifier = param_match[1]["identifier"].text.decode("utf-8")
             if len(identifier_split := identifier.split(" ")) > 1:
                 param_type += identifier_split[0]
                 identifier = identifier_split[1]
 
-            params.append(
+            cpp_params.append(
                 (
                     param_type,
                     identifier,
@@ -154,37 +184,34 @@ def build_function(
             )
 
     params_text = ""
-    for param in params:
+    for param in cpp_params:
         params_text += f', "{param[1]}"_a'
         if param[2]:
             params_text += f" = {param[2]}"
 
-    fn_name = match["name"].text.decode("utf-8")
-    bind_name = fn_name
-    if python_name:
-        bind_name = python_name
+    cpp_names = [f["name"].text.decode("utf-8") for f in function.cpp_declarations]
 
-    # Get the proper definition function e.g. def, def_prop_ro, def_static
-    def_fn = "def"
-    if fn_name.startswith("get"):
-        def_fn = "def_prop_ro"
-        bind_name = fn_name[4:]
-    elif "storage_class" in match:
-        storage_class = match["storage_class"].text.decode("utf-8")
+    def_fn = {
+        BindingType.PLAIN: "def",
+        BindingType.OVERLOAD: "def",
+        BindingType.PROP_RO: "def_prop_ro",
+        BindingType.PROP_RW: "def_prop_rw",
+    }[function.binding_type]
+
+    if "storage_class" in cpp_match:
+        storage_class = cpp_match["storage_class"].text.decode("utf-8")
         match storage_class:
             case "static":
                 def_fn = "def_static"
 
-    # __ is reserved in C++
-    if fn_name.startswith("magic"):
-        fn_name = "__" + fn_name[6:] + "__"
+    ref = "&" + ", ".join(
+        [(class_name + "::" if class_name else "") + cpp_name for cpp_name in cpp_names]
+    )
 
-    ref = "&" + (class_name + "::" if class_name else "") + fn_name
+    if function.binding_type == BindingType.OVERLOAD:
+        ref = f'nb::overload_cast<{", ".join([p[0] for p in cpp_params])}>({ref})'
 
-    if overload:
-        ref = f'nb::overload_cast<{", ".join([p[0] for p in params])}>({ref})'
-
-    return f'.{def_fn}("{bind_name}", {ref}{params_text}, "{doc}")'
+    return f'.{def_fn}("{function.py_name}", {ref}{params_text}, "{docstring}")'
 
 
 query_class_comment = DOXYGEN_LANGUAGE.query("""
@@ -200,10 +227,77 @@ func_doc_brief_query = DOXYGEN_LANGUAGE.query("""
 """)
 
 
+def build_functions(node: Node, class_name: Optional[str]) -> list[str]:
+    functions: list[FunctionBinding] = []
+    for match in (method_query if class_name else function_query).matches(node):
+        cpp_name = match[1]["name"].text.decode("utf-8")
+        function_doxygen = FunctionDoxygen.parse(match[1]["comment"], cpp_name)
+
+        if not function_doxygen.should_bind:
+            continue
+
+        py_name = cpp_name
+        # py_names = [m[0] for m in methods]
+        py_names = [m.py_name for m in functions]
+
+        # Parse the nb_dict
+        nb_dict_pattern = r"(\w+):\s*([^,]+)"
+        nb_dict_matches = re.findall(nb_dict_pattern, function_doxygen.nb_dict)
+        nb_dict_parsed: Dict[str, str] = {
+            key: value.strip() for key, value in nb_dict_matches
+        }
+        function = FunctionBinding(
+            py_name, [match[1]], function_doxygen, BindingType.PLAIN
+        )
+
+        # exists = False
+        # i = -1
+        # if py_name in py_names:
+        #     exists = True
+        #     i = py_names.index(py_name)
+
+        if "name" in nb_dict_parsed:
+            function.py_name = nb_dict_parsed["name"]
+
+        elif "prop_r" in nb_dict_parsed:
+            py_name = nb_dict_parsed["prop_r"]
+            if py_name in py_names:
+                i = py_names.index(py_name)
+                functions[i].cpp_declarations.insert(0, match[1])
+                function = None
+            else:
+                function.py_name = py_name
+                function.binding_type = BindingType.PROP_RO
+
+        elif "prop_w" in nb_dict_parsed:
+            py_name = nb_dict_parsed["prop_w"]
+            if py_name in py_names:
+                i = py_names.index(py_name)
+                function = None
+                functions[i].cpp_declarations.append(match[1])
+                functions[i].binding_type = BindingType.PROP_RW
+            else:
+                function.py_name = py_name
+                function.binding_type = BindingType.PROP_RW
+        # Overload
+        elif py_name in py_names:
+            i = py_names.index(py_name)
+            functions[i].binding_type = BindingType.OVERLOAD
+            function.binding_type = BindingType.OVERLOAD
+
+        if function:
+            functions.append(function)
+
+    # for method in methods:
+    #     build_function(method)
+
+    fn_defs = [build_function(method, class_name) for method in functions]
+
+    return fn_defs
+
+
 # Match classes
 def generate_classes(node: Node) -> str:
-    output = ""
-
     classes: List[str] = []
 
     for match in class_query.matches(node):
@@ -228,16 +322,8 @@ def generate_classes(node: Node) -> str:
             TAB + f'nb::class_<{", ".join(class_hierarchy)}>(m, "{class_name}")'
         )
 
-        # Bind class methods
-        fn_matches = method_query.matches(match[1]["class"])
-        fn_names = [match[1]["name"].text for match in fn_matches]
-        fn_defs = [
-            f"\n{TAB}{TAB}"
-            + build_function(
-                match[1], fn_names.count(match[1]["name"].text) > 1, class_name
-            )
-            for match in fn_matches
-        ]
+        fn_defs = build_functions(match[1]["class"], class_name)
+        fn_defs = ["\n" + 2 * TAB + fn_def for fn_def in fn_defs]
         class_output += "".join(fn_defs) + ";"
 
         classes.append(class_output)
@@ -246,15 +332,8 @@ def generate_classes(node: Node) -> str:
 
 
 def generate_free_functions(node: Node) -> str:
-    fn_matches = function_query.matches(node)
-    fn_names = [match[1]["name"].text for match in fn_matches]
-    fn_defs = [
-        TAB
-        + "m"
-        + build_function(match[1], fn_names.count(match[1]["name"].text) > 1, None)
-        + ";"
-        for match in fn_matches
-    ]
+    fn_defs = build_functions(node, None)
+    fn_defs = [TAB + "m" + fn_def + ";" for fn_def in fn_defs]
 
     output = f"\n\n".join(fn_defs)
     return output
@@ -262,7 +341,7 @@ def generate_free_functions(node: Node) -> str:
 
 def generate_enums(node: Node) -> str:
     enum_query = CPP_LANGUAGE.query("""((comment)
-                            . 
+                            .
                           (enum_specifier
                             name: (type_identifier) @name
                             body: (enumerator_list

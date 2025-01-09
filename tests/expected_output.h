@@ -6,11 +6,14 @@ void bind_input(nb::module_ &m)
 {
     // Classes
     nb::class_<Test>(m, "Test")
+        .def("nontrivial_params", &Test::nontrivial_params, "&a"_a, "*b"_a = nullptr, "&c"_a = std::vector<int>(), "Complex parameters\n\nArgs:\n    a: a\n    b: b\n    c: c")
         .def("overload", nb::overload_cast<double>(&Test::overload), "&a"_a, "An overloaded function\n\nArgs:\n    a: First param")
-        .def("overload", nb::overload_cast<int>(&Test::overload), "a"_a, "An overloaded function\n\nArgs:\n    a: Alternate param");
+        .def("overload", nb::overload_cast<int>(&Test::overload), "a"_a, "An overloaded function\n\nArgs:\n    a: Alternate param")
+        .def("__magic__", &Test::magic, "A magic method");
 
     nb::class_<Test2>(m, "Test2")
-        .def("trivial", &Test2::trivial, "Trivial function");
+        .def_prop_rw("name", &Test2::get_name, Test2::set_name, "Get the name object\n\nReturns: The name")
+        .def_prop_ro("prop", &Test2::get_prop, "Read-only property");
 
     // Functions
     m.def("free", &free, "a"_a, "b"_a, "A free function\n\nArgs:\n    a: Hello\n    b: Bye\n\nReturns: Fye");
