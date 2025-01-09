@@ -184,7 +184,10 @@ def build_function(
         for param_match in parameter_query.matches(cpp_match["parameters"]):
             param_type = param_match[1]["type"].text.decode("utf-8")
             identifier = param_match[1]["identifier"].text.decode("utf-8")
+
+            # TODO(akoen): I think this can be removed
             if len(identifier_split := identifier.split(" ")) > 1:
+                raise AssertionError()
                 param_type += identifier_split[0]
                 identifier = identifier_split[1]
 
@@ -200,7 +203,10 @@ def build_function(
 
     params_text = ""
     for param in cpp_params:
-        params_text += f', "{param[1]}"_a'
+        param_name = param[1] if param[1][0] not in ["*", "&"] else param[1][1:]
+        params_text += f', "{param_name}"_a'
+        # params_text += f', "{param[1]}"_a'
+
         if param[2]:
             params_text += f" = {param[2]}"
 
