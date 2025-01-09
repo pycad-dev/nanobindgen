@@ -6,6 +6,20 @@ class Test
 {
   public:
     /**
+     * Construct a new Test object
+     * @nb
+     */
+    Test();
+    
+
+    /**
+     * Construct a new Test object
+     *
+     * @nb
+     */
+    Test(int a);
+
+    /**
      * Complex parameters
      *
      * @param a a

@@ -43,8 +43,9 @@ method_query = CPP_LANGUAGE.query("""
         ))
 """)
 
-function_query = CPP_LANGUAGE.query("""
-((comment) @comment
+free_function_query = CPP_LANGUAGE.query("""
+((translation_unit
+(comment) @comment
  .
  (declaration
      (storage_class_specifier)? @storage_class
@@ -52,8 +53,21 @@ function_query = CPP_LANGUAGE.query("""
          declarator: (identifier) @name
          parameters: (parameter_list)? @parameters
      )
-    ))
+    )))
 """)
+
+constructor_query = CPP_LANGUAGE.query("""
+((field_declaration_list
+  (comment) @comment
+   .
+   (declaration
+       (storage_class_specifier)? @storage_class
+       declarator: (function_declarator
+           declarator: (identifier) @name
+           parameters: (parameter_list)? @parameters
+       ))
+    ))
+    """)
 
 # Unfortunately, tree-sitter does not allow node type alternations
 parameter_query = CPP_LANGUAGE.query("""
@@ -142,6 +156,7 @@ class FunctionDoxygen:
 
 class BindingType(Enum):
     PLAIN = auto()
+    INIT = auto()
     OVERLOAD = auto()
     PROP_RO = auto()
     PROP_RW = auto()
@@ -193,6 +208,7 @@ def build_function(
 
     def_fn = {
         BindingType.PLAIN: "def",
+        BindingType.INIT: "def",
         BindingType.OVERLOAD: "def",
         BindingType.PROP_RO: "def_prop_ro",
         BindingType.PROP_RW: "def_prop_rw",
@@ -208,8 +224,17 @@ def build_function(
         [(class_name + "::" if class_name else "") + cpp_name for cpp_name in cpp_names]
     )
 
+    template_params = ", ".join([p[0] for p in cpp_params])
+
+    # Constructors
+    # .def(nb::init<const std::string &>())
+    if function.binding_type == BindingType.INIT:
+        return f'.{def_fn}(nb::init<{template_params}>(){params_text}, "{docstring}")'
+
+    # Overloads
+    # .def("set", nb::overload_cast<int>(&Pet::set), "Set the pet's age")
     if function.binding_type == BindingType.OVERLOAD:
-        ref = f'nb::overload_cast<{", ".join([p[0] for p in cpp_params])}>({ref})'
+        ref = f"nb::overload_cast<{template_params}>({ref})"
 
     return f'.{def_fn}("{function.py_name}", {ref}{params_text}, "{docstring}")'
 
@@ -229,7 +254,14 @@ func_doc_brief_query = DOXYGEN_LANGUAGE.query("""
 
 def build_functions(node: Node, class_name: Optional[str]) -> list[str]:
     functions: list[FunctionBinding] = []
-    for match in (method_query if class_name else function_query).matches(node):
+
+    matches = (
+        constructor_query.matches(node) + method_query.matches(node)
+        if class_name
+        else free_function_query.matches(node)
+    )
+
+    for match in matches:
         cpp_name = match[1]["name"].text.decode("utf-8")
         function_doxygen = FunctionDoxygen.parse(match[1]["comment"], cpp_name)
 
@@ -256,7 +288,10 @@ def build_functions(node: Node, class_name: Optional[str]) -> list[str]:
         #     exists = True
         #     i = py_names.index(py_name)
 
-        if "name" in nb_dict_parsed:
+        if cpp_name == class_name:
+            function.binding_type = BindingType.INIT
+
+        elif "name" in nb_dict_parsed:
             function.py_name = nb_dict_parsed["name"]
 
         elif "prop_r" in nb_dict_parsed:
