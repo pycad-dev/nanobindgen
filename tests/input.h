@@ -17,7 +17,7 @@ class Test
      *
      * @nb
      */
-    Test(int a);
+    Test(int &a);
 
     /**
      * Complex parameters
