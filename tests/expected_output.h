@@ -10,8 +10,10 @@ void bind_input(nb::module_ &m)
         .def(nb::init<int>(), "a"_a, "Construct a new Test object")
         .def("nontrivial_params", &Test::nontrivial_params, "&a"_a, "*b"_a = nullptr, "&c"_a = std::vector<int>(), "Complex parameters\n\nArgs:\n    a: a\n    b: b\n    c: c")
         .def("overload", nb::overload_cast<double>(&Test::overload), "&a"_a, "An overloaded function\n\nArgs:\n    a: First param")
-        .def("overload", nb::overload_cast<int>(&Test::overload), "a"_a, "An overloaded function\n\nArgs:\n    a: Alternate param")
-        .def("__magic__", &Test::magic, "A magic method");
+        .def("overload", nb::overload_cast<int>(&Test::overload), "b"_a, "An overloaded function\n\nArgs:\n    b: Alternate param")
+        .def("__magic__", &Test::magic, "A magic method")
+        .def("__magico__", nb::overload_cast<double>(&Test::overload_magic), "&a"_a, "An overloaded magic function\n\nArgs:\n    a: First param")
+        .def("__magico__", nb::overload_cast<int>(&Test::overload_magic), "b"_a, "An overloaded magic function\n\nArgs:\n    b: Alternate param");
 
     nb::class_<Test2>(m, "Test2")
         .def_prop_rw("name", &Test2::get_name, Test2::set_name, "Get the name object\n\nReturns: The name")

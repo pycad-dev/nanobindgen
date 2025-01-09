@@ -41,16 +41,34 @@ class Test
     /**
      * An overloaded function
      *
-     * @param a Alternate param
+     * @param b Alternate param
      * @nb
      */
-    void overload(int a);
+    void overload(int b);
+
 
     /**
      * A magic method
      * @nb name: __magic__
      */
     void magic();
+
+
+    /**
+     * An overloaded magic function
+     *
+     * @param a First param
+     * @nb name: __magico__
+     */
+    void overload_magic(double &a);
+
+    /**
+     * An overloaded magic function
+     *
+     * @param b Alternate param
+     * @nb name: __magico__
+     */
+    void overload_magic(int b);
 
     static int static_method();
 };

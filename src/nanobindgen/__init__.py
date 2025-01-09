@@ -268,7 +268,6 @@ def build_functions(node: Node, class_name: Optional[str]) -> list[str]:
         if not function_doxygen.should_bind:
             continue
 
-        py_name = cpp_name
         # py_names = [m[0] for m in methods]
         py_names = [m.py_name for m in functions]
 
@@ -279,14 +278,8 @@ def build_functions(node: Node, class_name: Optional[str]) -> list[str]:
             key: value.strip() for key, value in nb_dict_matches
         }
         function = FunctionBinding(
-            py_name, [match[1]], function_doxygen, BindingType.PLAIN
+            cpp_name, [match[1]], function_doxygen, BindingType.PLAIN
         )
-
-        # exists = False
-        # i = -1
-        # if py_name in py_names:
-        #     exists = True
-        #     i = py_names.index(py_name)
 
         if cpp_name == class_name:
             function.binding_type = BindingType.INIT
@@ -294,29 +287,29 @@ def build_functions(node: Node, class_name: Optional[str]) -> list[str]:
         elif "name" in nb_dict_parsed:
             function.py_name = nb_dict_parsed["name"]
 
-        elif "prop_r" in nb_dict_parsed:
-            py_name = nb_dict_parsed["prop_r"]
-            if py_name in py_names:
-                i = py_names.index(py_name)
+        if "prop_r" in nb_dict_parsed:
+            py_name_parsed = nb_dict_parsed["prop_r"]
+            if py_name_parsed in py_names:
+                i = py_names.index(py_name_parsed)
                 functions[i].cpp_declarations.insert(0, match[1])
                 function = None
             else:
-                function.py_name = py_name
+                function.py_name = py_name_parsed
                 function.binding_type = BindingType.PROP_RO
 
         elif "prop_w" in nb_dict_parsed:
-            py_name = nb_dict_parsed["prop_w"]
-            if py_name in py_names:
-                i = py_names.index(py_name)
+            py_name_parsed = nb_dict_parsed["prop_w"]
+            if py_name_parsed in py_names:
+                i = py_names.index(py_name_parsed)
                 function = None
                 functions[i].cpp_declarations.append(match[1])
                 functions[i].binding_type = BindingType.PROP_RW
             else:
-                function.py_name = py_name
+                function.py_name = py_name_parsed
                 function.binding_type = BindingType.PROP_RW
         # Overload
-        elif py_name in py_names:
-            i = py_names.index(py_name)
+        elif function.py_name in py_names and function.binding_type != BindingType.INIT:
+            i = py_names.index(function.py_name)
             functions[i].binding_type = BindingType.OVERLOAD
             function.binding_type = BindingType.OVERLOAD
 
