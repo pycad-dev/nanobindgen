@@ -117,6 +117,10 @@ class FunctionDoxygen:
                 case "tag":
                     match n.children[0].text.decode("utf-8"):
                         case "@param":
+                            if len(n.children) < 3:
+                                raise RuntimeError(
+                                    f"Missing parameter description for {n.children[1].text.decode('utf-8')} in {cpp_name}"
+                                )
                             dox_params.append(
                                 (
                                     n.children[1].text.decode("utf-8"),
@@ -168,6 +172,7 @@ class FunctionBinding:
     cpp_declarations: List[Dict[str, Node]]
     doxygen: FunctionDoxygen
     binding_type: BindingType = BindingType.PLAIN
+    extra: Optional[str] = ""
 
 
 def build_function(
@@ -191,7 +196,8 @@ def build_function(
                 identifier = identifier[1:]
 
             # TODO(akoen): I think this can be removed
-            if len(identifier_split := identifier.split(" ")) > 1:
+            if len(identifier_split := identifier.strip().split(" ")) > 1:
+                print(identifier_split)
                 raise AssertionError()
                 param_type += identifier_split[0]
                 identifier = identifier_split[1]
@@ -229,23 +235,28 @@ def build_function(
             case "static":
                 def_fn = "def_static"
 
-    ref = "&" + ", ".join(
-        [(class_name + "::" if class_name else "") + cpp_name for cpp_name in cpp_names]
+    ref = ", ".join(
+        [
+            "&" + (class_name + "::" if class_name else "") + cpp_name
+            for cpp_name in cpp_names
+        ]
     )
 
     template_params = ", ".join([p[0] for p in cpp_params])
 
+    extra = ", " + function.extra if function.extra else ""
+
     # Constructors
     # .def(nb::init<const std::string &>())
     if function.binding_type == BindingType.INIT:
-        return f'.{def_fn}(nb::init<{template_params}>(){params_text}, "{docstring}")'
+        return f'.{def_fn}(nb::init<{template_params}>(){params_text}, "{docstring}"{extra})'
 
     # Overloads
     # .def("set", nb::overload_cast<int>(&Pet::set), "Set the pet's age")
     if function.binding_type == BindingType.OVERLOAD:
         ref = f"nb::overload_cast<{template_params}>({ref})"
 
-    return f'.{def_fn}("{function.py_name}", {ref}{params_text}, "{docstring}")'
+    return f'.{def_fn}("{function.py_name}", {ref}{params_text}, "{docstring}"{extra})'
 
 
 query_class_comment = DOXYGEN_LANGUAGE.query("""
@@ -259,6 +270,29 @@ query_class_comment = DOXYGEN_LANGUAGE.query("""
 func_doc_brief_query = DOXYGEN_LANGUAGE.query("""
 ((description) @description)
 """)
+
+
+def parse_nb_dict(nb_dict: str) -> dict[str, str]:
+    """Parse an @nb dict.
+
+    Format is * @nb key: value, key: value, ...
+
+    Args:
+        nb_dict: The nb dict
+
+    Returns:
+        parsed dictionary
+    """
+    # Match a key-value pair of form key: value, key: value
+    # , in value can be escaped with single quotes
+
+    nb_dict_pattern = r"(\w+):\s+((?:(?:'[^']*')|[^,])+)"
+
+    nb_dict_matches = re.findall(nb_dict_pattern, nb_dict)
+    nb_dict_parsed: Dict[str, str] = {
+        key: value.strip(" '") for key, value in nb_dict_matches
+    }
+    return nb_dict_parsed
 
 
 def build_functions(node: Node, class_name: Optional[str]) -> list[str]:
@@ -277,15 +311,10 @@ def build_functions(node: Node, class_name: Optional[str]) -> list[str]:
         if not function_doxygen.should_bind:
             continue
 
-        # py_names = [m[0] for m in methods]
         py_names = [m.py_name for m in functions]
 
-        # Parse the nb_dict
-        nb_dict_pattern = r"(\w+):\s*([^,]+)"
-        nb_dict_matches = re.findall(nb_dict_pattern, function_doxygen.nb_dict)
-        nb_dict_parsed: Dict[str, str] = {
-            key: value.strip() for key, value in nb_dict_matches
-        }
+        nb_dict_parsed = parse_nb_dict(function_doxygen.nb_dict)
+
         function = FunctionBinding(
             cpp_name, [match[1]], function_doxygen, BindingType.PLAIN
         )
@@ -295,6 +324,9 @@ def build_functions(node: Node, class_name: Optional[str]) -> list[str]:
 
         elif "name" in nb_dict_parsed:
             function.py_name = nb_dict_parsed["name"]
+
+        if "extra" in nb_dict_parsed:
+            function.extra = nb_dict_parsed["extra"].strip("'")
 
         if "prop_r" in nb_dict_parsed:
             py_name_parsed = nb_dict_parsed["prop_r"]
@@ -325,15 +357,11 @@ def build_functions(node: Node, class_name: Optional[str]) -> list[str]:
         if function:
             functions.append(function)
 
-    # for method in methods:
-    #     build_function(method)
-
     fn_defs = [build_function(method, class_name) for method in functions]
 
     return fn_defs
 
 
-# Match classes
 def generate_classes(node: Node) -> str:
     classes: List[str] = []
 
@@ -341,22 +369,35 @@ def generate_classes(node: Node) -> str:
         class_name = match[1]["name"].text.decode("utf-8")
         class_hierarchy = [class_name]
 
-        if "comment" in match[1]:
-            comment = match[1]["comment"]
-            comment_tree = doxygen_parser.parse(comment.text)
-            for comment_match in query_class_comment.matches(comment_tree.root_node):
-                match comment_match[1]["tag_name"].text.decode("utf-8"):
-                    case "@inherit":
-                        class_hierarchy.extend(
-                            comment_match[1]["description"]
-                            .text.decode("utf-8")
-                            .strip()
-                            .split(", ")
-                        )
-                ...
+        should_bind = False
+        nb_dict = ""
+
+        comment = match[1]["comment"]
+        doxygen_node = doxygen_parser.parse(comment.text).root_node
+
+        for n in doxygen_node.children:
+            match n.type:
+                case "tag":
+                    match n.children[0].text.decode("utf-8"):
+                        case "@nb":
+                            should_bind = True
+                            if len(n.children) > 1:
+                                nb_dict = n.children[1].text.decode("utf-8")
+
+        if not should_bind:
+            continue
+
+        nb_dict_parsed = parse_nb_dict(nb_dict)
+
+        if "inherit" in nb_dict_parsed:
+            class_hierarchy.append(nb_dict_parsed["inherit"])
+
+        extra = ""
+        if "extra" in nb_dict_parsed:
+            extra = ", " + nb_dict_parsed["extra"]
 
         class_output = (
-            TAB + f'nb::class_<{", ".join(class_hierarchy)}>(m, "{class_name}")'
+            TAB + f'nb::class_<{", ".join(class_hierarchy)}>(m, "{class_name}"{extra})'
         )
 
         fn_defs = build_functions(match[1]["class"], class_name)
@@ -377,7 +418,7 @@ def generate_free_functions(node: Node) -> str:
 
 
 def generate_enums(node: Node) -> str:
-    enum_query = CPP_LANGUAGE.query("""((comment)
+    enum_query = CPP_LANGUAGE.query("""((comment) @comment
                             .
                           (enum_specifier
                             name: (type_identifier) @name
@@ -388,6 +429,26 @@ def generate_enums(node: Node) -> str:
     matches = enum_query.matches(node)
     enums = []
     for match in matches:
+        should_bind = False
+        nb_dict = ""
+
+        comment = match[1]["comment"]
+        doxygen_node = doxygen_parser.parse(comment.text).root_node
+
+        for n in doxygen_node.children:
+            match n.type:
+                case "tag":
+                    match n.children[0].text.decode("utf-8"):
+                        case "@nb":
+                            should_bind = True
+                            if len(n.children) > 1:
+                                nb_dict = n.children[1].text.decode("utf-8")
+
+        if not should_bind:
+            continue
+
+        nb_dict_parsed = parse_nb_dict(nb_dict)
+
         name = match[1]["name"].text.decode("utf-8")
         enumerators: list[tuple[str, str]] = []
         enumerator_nodes = [

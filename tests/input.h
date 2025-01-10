@@ -1,6 +1,6 @@
 /**
  * Test
- *
+ * @nb extra: 'nb::intrusive_ptr<Test>([](Test* o, PyObject* po) noexcept { o->set_self_py(po); }'
  */
 class Test
 {
@@ -10,7 +10,6 @@ class Test
      * @nb
      */
     Test();
-    
 
     /**
      * Construct a new Test object
@@ -46,13 +45,11 @@ class Test
      */
     void overload(int b);
 
-
     /**
      * A magic method
      * @nb name: __magic__
      */
     void magic();
-
 
     /**
      * An overloaded magic function
@@ -75,7 +72,7 @@ class Test
 
 /**
  * Second class
- *
+ * @nb inherit: Test
  */
 class Test2
 {
@@ -101,6 +98,14 @@ class Test2
      * @nb prop_r: prop
      */
     void get_prop();
+
+    /**
+     * Iterate through this list
+     *
+     * @return iterator
+     * @nb name: __iter__, extra: 'nb::keep_alive<0, 1>()'
+     */
+    auto iter() -> nb::typed<nb::iterator, ref<Test>&>;
 };
 
 /**
@@ -126,3 +131,24 @@ void free(int a, double b);
  * @nb
  */
 int free_return_simple();
+
+/**
+ * Enum example
+ * @nb
+ */
+enum class TestEnum : std::uint8_t
+{
+    CAR,
+    TRUCK,
+    BIKE
+};
+
+/**
+ * An unbound enum
+ */
+enum class DontBind 
+{
+    DO,
+    NOT,
+    BIND
+};
