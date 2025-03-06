@@ -487,13 +487,14 @@ def build_header(header_name: str, source_code: str) -> str:
 
 void bind_{header_name.lower()}(nb::module_ &m)
 {{
+    // Enums
+{enums}
+
     // Classes
 {classes}
 
     // Functions
 {free_functions}
 
-    // Enums
-{enums}
 }};
 """

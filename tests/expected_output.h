@@ -4,6 +4,12 @@
 
 void bind_input(nb::module_ &m)
 {
+    // Enums
+    nb::enum_<TestEnum>(m, "TestEnum")
+        .value("CAR", TestEnum::CAR)
+        .value("TRUCK", TestEnum::TRUCK)
+        .value("BIKE", TestEnum::BIKE);
+
     // Classes
     nb::class_<Test>(m, "Test", nb::intrusive_ptr<Test>([](Test* o, PyObject* po) noexcept { o->set_self_py(po); })
         .def(nb::init<>(), "Construct a new Test object")
@@ -25,9 +31,4 @@ void bind_input(nb::module_ &m)
 
     m.def("free_return_simple", &free_return_simple, "A simple return type\n\nReturns: Simple return type");
 
-    // Enums
-    nb::enum_<TestEnum>(m, "TestEnum")
-        .value("CAR", TestEnum::CAR)
-        .value("TRUCK", TestEnum::TRUCK)
-        .value("BIKE", TestEnum::BIKE);
 };
