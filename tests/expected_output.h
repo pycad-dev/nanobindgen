@@ -19,7 +19,8 @@ void bind_input(nb::module_ &m)
         .def("overload", nb::overload_cast<int>(&Test::overload), "b"_a, "An overloaded function\n\nArgs:\n    b: Alternate param")
         .def("__magic__", &Test::magic, "A magic method")
         .def("__magico__", nb::overload_cast<double &>(&Test::overload_magic), "a"_a, "An overloaded magic function\n\nArgs:\n    a: First param")
-        .def("__magico__", nb::overload_cast<int>(&Test::overload_magic), "b"_a, "An overloaded magic function\n\nArgs:\n    b: Alternate param");
+        .def("__magico__", nb::overload_cast<int>(&Test::overload_magic), "b"_a, "An overloaded magic function\n\nArgs:\n    b: Alternate param")
+        .def_prop_ro_static("static_property", &Test::static_property, "Static property");
 
     nb::class_<Test2, Test>(m, "Test2")
         .def_prop_rw("name", &Test2::get_name, &Test2::set_name, "Get the name object\n\nReturns: The name")

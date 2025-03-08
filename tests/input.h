@@ -67,6 +67,13 @@ class Test
      */
     void overload_magic(int b);
 
+    /**
+     * Static property
+     * @nb prop_r: static_property
+     */
+    static void static_property();
+
+
     static int static_method();
 };
 

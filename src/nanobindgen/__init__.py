@@ -160,10 +160,13 @@ class FunctionDoxygen:
 
 class BindingType(Enum):
     PLAIN = auto()
+    STATIC = auto()
     INIT = auto()
     OVERLOAD = auto()
     PROP_RO = auto()
     PROP_RW = auto()
+    STATIC_PROP_RO = auto()
+    STATIC_PROP_RW = auto()
 
 
 @dataclass
@@ -223,17 +226,14 @@ def build_function(
 
     def_fn = {
         BindingType.PLAIN: "def",
+        BindingType.STATIC: "def_static",
         BindingType.INIT: "def",
         BindingType.OVERLOAD: "def",
         BindingType.PROP_RO: "def_prop_ro",
         BindingType.PROP_RW: "def_prop_rw",
+        BindingType.STATIC_PROP_RO: "def_prop_ro_static",
+        BindingType.STATIC_PROP_RW: "def_prop_rw_static",
     }[function.binding_type]
-
-    if "storage_class" in cpp_match:
-        storage_class = cpp_match["storage_class"].text.decode("utf-8")
-        match storage_class:
-            case "static":
-                def_fn = "def_static"
 
     ref = ", ".join(
         [
@@ -319,6 +319,14 @@ def build_functions(node: Node, class_name: Optional[str]) -> list[str]:
             cpp_name, [match[1]], function_doxygen, BindingType.PLAIN
         )
 
+        # Check if method is static
+        is_static = False
+        if "storage_class" in match[1]:
+            storage_class = match[1]["storage_class"].text.decode("utf-8")
+            if storage_class == "static":
+                is_static = True
+                function.binding_type = BindingType.STATIC
+
         if cpp_name == class_name:
             function.binding_type = BindingType.INIT
 
@@ -336,7 +344,9 @@ def build_functions(node: Node, class_name: Optional[str]) -> list[str]:
                 function = None
             else:
                 function.py_name = py_name_parsed
-                function.binding_type = BindingType.PROP_RO
+                function.binding_type = (
+                    BindingType.STATIC_PROP_RO if is_static else BindingType.PROP_RO
+                )
 
         elif "prop_w" in nb_dict_parsed:
             py_name_parsed = nb_dict_parsed["prop_w"]
@@ -344,10 +354,14 @@ def build_functions(node: Node, class_name: Optional[str]) -> list[str]:
                 i = py_names.index(py_name_parsed)
                 function = None
                 functions[i].cpp_declarations.append(match[1])
-                functions[i].binding_type = BindingType.PROP_RW
+                functions[i].binding_type = (
+                    BindingType.STATIC_PROP_RW if is_static else BindingType.PROP_RW
+                )
             else:
                 function.py_name = py_name_parsed
-                function.binding_type = BindingType.PROP_RW
+                function.binding_type = (
+                    BindingType.STATIC_PROP_RW if is_static else BindingType.PROP_RW
+                )
         # Overload
         elif function.py_name in py_names and function.binding_type != BindingType.INIT:
             i = py_names.index(function.py_name)
